@@ -37,11 +37,11 @@
   "homepage": "https://deckcosttoronto.com/developers",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deckcosttoronto/api.git",
+    "url": "git+https://github.com/Deck-Cost-Toronto/api.git",
     "directory": "packages/sdk"
   },
   "bugs": {
-    "url": "https://github.com/deckcosttoronto/api/issues"
+    "url": "https://github.com/Deck-Cost-Toronto/api/issues"
   },
   "devDependencies": {
     "tsup": "^8.3.0",
