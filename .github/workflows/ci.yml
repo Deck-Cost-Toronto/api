@@ -29,9 +29,6 @@ jobs:
         run: npm run build
 
       - name: Smoke test against live API
-        # Hits the already-shipped read endpoints. The POST /estimate smoke
-        # gets added back once the prod deploy of deckcosttoronto.com ships
-        # the calculator endpoint.
         run: |
           node --input-type=module -e "
             import { DeckCostClient } from './dist/index.js';
@@ -42,7 +39,13 @@ jobs:
             if (!(cities?.count > 0)) { console.error('cities failed'); process.exit(1); }
             const toronto = await c.getCity('toronto');
             if (toronto?.data?.slug !== 'toronto') { console.error('city failed'); process.exit(1); }
-            console.log('smoke ok:', { materials: p.data.materials.length, cities: cities.count });
+            const e = await c.estimate({
+              lengthFt: 16, widthFt: 12, material: 'composite', height: 'mid',
+              railing: 'aluminum', hasStairs: true, numSteps: 3,
+              features: ['lighting'], demolishExisting: false, includePermit: true,
+            });
+            if (!(e?.data?.total?.low > 0)) { console.error('estimate failed', e); process.exit(1); }
+            console.log('smoke ok:', { materials: p.data.materials.length, cities: cities.count, total: e.data.total });
           "
 
   spec:
