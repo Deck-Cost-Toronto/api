@@ -1,0 +1,13 @@
+# Redocly lint config.
+#
+# This is a public, keyless API by design — `security: []` at the root of
+# openapi.yaml declares "no auth required" globally. The two rule overrides
+# below match the API's intentional shape (keyless reads with no 4xx paths).
+
+extends:
+  - recommended
+
+rules:
+  # Read endpoints take no input and have no application-level 4xx.
+  # Infra-level errors (500, network) aren't in the contract.
+  operation-4xx-response: off

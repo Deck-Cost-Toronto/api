@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  sdk:
+    name: SDK typecheck + build + smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test against live API
+        run: |
+          node --input-type=module -e "
+            import { DeckCostClient } from './dist/index.js';
+            const c = new DeckCostClient();
+            const p = await c.getPricing();
+            if (!p?.data?.materials?.length) { console.error('pricing failed'); process.exit(1); }
+            const e = await c.estimate({
+              lengthFt: 16, widthFt: 12, material: 'composite', height: 'mid',
+              railing: 'aluminum', hasStairs: true, numSteps: 3,
+              features: ['lighting'], demolishExisting: false, includePermit: true,
+            });
+            if (!(e?.data?.total?.low > 0)) { console.error('estimate failed', e); process.exit(1); }
+            console.log('smoke ok: total', e.data.total);
+          "
+
+  spec:
+    name: OpenAPI spec lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Lint openapi.yaml
+        run: npx -y @redocly/cli@latest lint openapi.yaml

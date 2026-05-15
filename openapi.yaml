@@ -1,0 +1,541 @@
+openapi: 3.1.0
+info:
+  title: Deck Cost Toronto API
+  version: 1.0.0
+  description: Public, read-only JSON API exposing the GTA deck-pricing data and calculator that powers
+    deckcosttoronto.com. No auth, no signup, CC BY 4.0.
+  contact:
+    name: Deck Cost Toronto
+    email: hello@deckcosttoronto.com
+    url: https://deckcosttoronto.com/developers
+  license:
+    name: CC BY 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+servers:
+- url: https://deckcosttoronto.com
+  description: Production
+security: []
+paths:
+  /api/v1/pricing:
+    get:
+      summary: Get all pricing constants
+      description: Materials, heights, railings, feature add-ons, stairs, demolition, permit fees, and
+        the calculator's input bounds. The same numbers the on-site calculator uses.
+      operationId: getPricing
+      tags:
+      - Pricing
+      responses:
+        '200':
+          description: Pricing data envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingResponse'
+  /api/v1/cities:
+    get:
+      summary: List supported GTA cities
+      description: All cities the calculator has a dedicated landing page for. Returns a count plus a
+        list of City summary records.
+      operationId: listCities
+      tags:
+      - Cities
+      responses:
+        '200':
+          description: List of cities with metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitiesResponse'
+  /api/v1/cities/{slug}:
+    get:
+      summary: Get a single city
+      description: Full record for one city, including local-challenge prose and sample-build framing
+        used on that city's landing page.
+      operationId: getCity
+      tags:
+      - Cities
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        description: URL slug of the city (e.g. `toronto`, `mississauga`).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Full city record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CityResponse'
+        '404':
+          description: City slug not recognized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CityNotFoundResponse'
+  /api/v1/estimate:
+    post:
+      summary: Compute a deck cost estimate
+      description: Runs the canonical deck-cost calculator on a supplied input object. Returns the same
+        total range, per-sq-ft, breakdown, and plain-English assumptions the on-site UI displays. Rate-limited
+        to 60 requests per minute per IP.
+      operationId: createEstimate
+      tags:
+      - Estimate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstimateInput'
+      responses:
+        '200':
+          description: Computed estimate result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstimateResponse'
+        '400':
+          description: Request body was not valid JSON.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Request body did not match the expected schema.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '429':
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+components:
+  schemas:
+    PriceRange:
+      type: object
+      properties:
+        low:
+          type: number
+        high:
+          type: number
+      required:
+      - low
+      - high
+    MaterialId:
+      type: string
+      enum:
+      - pressure_treated
+      - cedar
+      - composite
+      - pvc
+    HeightId:
+      type: string
+      enum:
+      - ground
+      - low
+      - mid
+      - high
+    RailingId:
+      type: string
+      enum:
+      - none
+      - wood
+      - aluminum
+      - glass
+      - cable
+    FeatureId:
+      type: string
+      enum:
+      - pergola
+      - lighting
+      - bench
+      - planters
+    MaterialSpec:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/MaterialId'
+        label:
+          type: string
+        perSqFt:
+          $ref: '#/components/schemas/PriceRange'
+        blurb:
+          type: string
+      required:
+      - id
+      - label
+      - perSqFt
+      - blurb
+    HeightSpec:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/HeightId'
+        label:
+          type: string
+        multiplier:
+          $ref: '#/components/schemas/PriceRange'
+        blurb:
+          type: string
+      required:
+      - id
+      - label
+      - multiplier
+      - blurb
+    RailingSpec:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/RailingId'
+        label:
+          type: string
+        perLinearFoot:
+          $ref: '#/components/schemas/PriceRange'
+        blurb:
+          type: string
+      required:
+      - id
+      - label
+      - perLinearFoot
+      - blurb
+    FeatureSpec:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/FeatureId'
+        label:
+          type: string
+        flat:
+          $ref: '#/components/schemas/PriceRange'
+        blurb:
+          type: string
+      required:
+      - id
+      - label
+      - flat
+      - blurb
+    PricingResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        currency:
+          type: string
+          const: CAD
+        taxesIncluded:
+          type: boolean
+        region:
+          type: string
+        year:
+          type: integer
+        data:
+          type: object
+          properties:
+            materials:
+              type: array
+              items:
+                $ref: '#/components/schemas/MaterialSpec'
+            heights:
+              type: array
+              items:
+                $ref: '#/components/schemas/HeightSpec'
+            railings:
+              type: array
+              items:
+                $ref: '#/components/schemas/RailingSpec'
+            features:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeatureSpec'
+            stairsPerStep:
+              $ref: '#/components/schemas/PriceRange'
+            demolitionPerSqFt:
+              $ref: '#/components/schemas/PriceRange'
+            permitCost:
+              $ref: '#/components/schemas/PriceRange'
+            minProjectFloor:
+              $ref: '#/components/schemas/PriceRange'
+            sizeBounds:
+              type: object
+              properties:
+                min:
+                  type: integer
+                max:
+                  type: integer
+                defaultLength:
+                  type: integer
+                defaultWidth:
+                  type: integer
+              required:
+              - min
+              - max
+              - defaultLength
+              - defaultWidth
+            stairsBounds:
+              type: object
+              properties:
+                min:
+                  type: integer
+                max:
+                  type: integer
+                default:
+                  type: integer
+              required:
+              - min
+              - max
+              - default
+      required:
+      - version
+      - currency
+      - data
+    CitySummary:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        region:
+          type: string
+        population:
+          type: integer
+        intro:
+          type: string
+        permitNote:
+          type: string
+        neighbourhoods:
+          type: array
+          items:
+            type: string
+      required:
+      - slug
+      - name
+      - region
+    City:
+      allOf:
+      - $ref: '#/components/schemas/CitySummary'
+      - type: object
+        properties:
+          contextNotes:
+            type: array
+            items:
+              type: string
+          localChallenge:
+            type: string
+          sampleBuildIntro:
+            type: string
+          workingWithBuildersHere:
+            type: string
+          seasonalBooking:
+            type: string
+    CitiesResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        count:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CitySummary'
+      required:
+      - version
+      - count
+      - data
+    CityResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        data:
+          $ref: '#/components/schemas/City'
+      required:
+      - version
+      - data
+    CityNotFoundResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        error:
+          type: string
+          const: city_not_found
+        slug:
+          type: string
+      required:
+      - version
+      - error
+      - slug
+    EstimateInput:
+      type: object
+      description: Input to the calculator. All dimensions in feet. See /api/v1/pricing for the canonical
+        bounds and option lists.
+      properties:
+        lengthFt:
+          type: number
+          minimum: 8
+          maximum: 40
+          description: Deck length in feet.
+        widthFt:
+          type: number
+          minimum: 8
+          maximum: 40
+          description: Deck width in feet.
+        material:
+          $ref: '#/components/schemas/MaterialId'
+        height:
+          $ref: '#/components/schemas/HeightId'
+        railing:
+          $ref: '#/components/schemas/RailingId'
+        hasStairs:
+          type: boolean
+        numSteps:
+          type: integer
+          minimum: 0
+          maximum: 12
+          description: Number of stair steps. Ignored when hasStairs is false; must be >=1 when hasStairs
+            is true.
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureId'
+        demolishExisting:
+          type: boolean
+        includePermit:
+          type: boolean
+      required:
+      - lengthFt
+      - widthFt
+      - material
+      - height
+      - railing
+      - hasStairs
+      - numSteps
+      - features
+      - demolishExisting
+      - includePermit
+    CostBreakdown:
+      type: object
+      properties:
+        materialAndLabor:
+          $ref: '#/components/schemas/PriceRange'
+        railing:
+          $ref: '#/components/schemas/PriceRange'
+        stairs:
+          $ref: '#/components/schemas/PriceRange'
+        features:
+          $ref: '#/components/schemas/PriceRange'
+        demolition:
+          $ref: '#/components/schemas/PriceRange'
+        permit:
+          $ref: '#/components/schemas/PriceRange'
+      required:
+      - materialAndLabor
+      - railing
+      - stairs
+      - features
+      - demolition
+      - permit
+    CalculatorResult:
+      type: object
+      properties:
+        total:
+          $ref: '#/components/schemas/PriceRange'
+        perSqFt:
+          $ref: '#/components/schemas/PriceRange'
+        squareFeet:
+          type: number
+        railingLinearFeet:
+          type: number
+        breakdown:
+          $ref: '#/components/schemas/CostBreakdown'
+        assumptions:
+          type: array
+          items:
+            type: string
+      required:
+      - total
+      - perSqFt
+      - squareFeet
+      - railingLinearFeet
+      - breakdown
+      - assumptions
+    EstimateResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        input:
+          $ref: '#/components/schemas/EstimateInput'
+        data:
+          $ref: '#/components/schemas/CalculatorResult'
+      required:
+      - version
+      - input
+      - data
+    ErrorResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        error:
+          type: string
+        message:
+          type: string
+      required:
+      - version
+      - error
+    ValidationErrorResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          const: v1
+        error:
+          type: string
+          const: validation_failed
+        message:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              code:
+                type: string
+              message:
+                type: string
+            required:
+            - path
+            - code
+            - message
+      required:
+      - version
+      - error
+      - issues
+tags:
+- name: Pricing
+  description: Raw pricing constants used by the calculator.
+- name: Cities
+  description: Per-city metadata for the supported GTA cities.
+- name: Estimate
+  description: Run the calculator server-side.

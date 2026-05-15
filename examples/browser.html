@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Deck Cost Toronto API — browser example</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #111; }
+      pre  { background: #f4f4f4; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+      h1   { font-size: 1.4rem; margin-bottom: 0; }
+      p    { color: #555; margin-top: 0.25rem; }
+      button { padding: 0.5rem 1rem; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>Deck Cost Toronto API</h1>
+    <p>Vanilla JS call to <code>POST /api/v1/estimate</code>. CORS is open, so no proxy needed.</p>
+    <button id="run">Run estimate</button>
+    <pre id="out">Press the button…</pre>
+
+    <script type="module">
+      const BASE = "https://deckcosttoronto.com";
+      const out = document.getElementById("out");
+
+      document.getElementById("run").addEventListener("click", async () => {
+        out.textContent = "Loading…";
+        try {
+          const res = await fetch(`${BASE}/api/v1/estimate`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              lengthFt: 16,
+              widthFt: 12,
+              material: "composite",
+              height: "mid",
+              railing: "aluminum",
+              hasStairs: true,
+              numSteps: 3,
+              features: ["lighting"],
+              demolishExisting: false,
+              includePermit: true,
+            }),
+          });
+          const json = await res.json();
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (err) {
+          out.textContent = `Error: ${err.message}`;
+        }
+      });
+    </script>
+  </body>
+</html>
